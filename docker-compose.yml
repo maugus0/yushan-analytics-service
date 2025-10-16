@@ -1,0 +1,99 @@
+services:
+  # PostgreSQL Database for Analytics Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: yushan-analytics-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-yushan_analytics}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
+      POSTGRES_DB: ${DB_NAME:-yushan_analytics}
+    ports:
+      - "5435:5432"  # External:Internal (avoiding conflict with other services)
+    volumes:
+      - analytics_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - yushan-platform-network
+
+  # Redis Cache for Analytics Service (for caching aggregated metrics)
+  redis:
+    image: redis:7-alpine
+    container_name: yushan-analytics-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6382:6379"  # External:Internal (avoiding conflict with other services)
+    volumes:
+      - analytics_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - yushan-platform-network
+
+  # Analytics Service
+  analytics-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yushan-analytics-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+      # Database Configuration
+      DB_USERNAME: ${DB_USERNAME:-yushan_analytics}
+      DB_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
+      DB_NAME: ${DB_NAME:-yushan_analytics}
+      DB_HOST: postgres
+      DB_PORT: 5435
+
+      # Redis Configuration (for caching metrics)
+      REDIS_HOST: redis
+      REDIS_PORT: 6382
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # Eureka Configuration
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://yushan-eureka-registry:8761/eureka/
+
+      # Server Configuration
+      SERVER_PORT: 8083
+
+      # Analytics-specific Configuration
+      ANALYTICS_BATCH_SIZE: ${ANALYTICS_BATCH_SIZE:-1000}
+      ANALYTICS_AGGREGATION_INTERVAL: ${ANALYTICS_AGGREGATION_INTERVAL:-300}
+      ANALYTICS_RETENTION_DAYS: ${ANALYTICS_RETENTION_DAYS:-90}
+      ANALYTICS_CACHE_TTL: ${ANALYTICS_CACHE_TTL:-600}
+    ports:
+      - "8083:8083"
+    networks:
+      - yushan-platform-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  analytics_pg_data:
+    driver: local
+  analytics_redis_data:
+    driver: local
+
+# Connect to the existing Eureka network
+networks:
+  yushan-platform-network:
+    external: true
