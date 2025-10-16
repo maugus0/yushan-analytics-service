@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
       POSTGRES_DB: ${DB_NAME:-yushan_analytics}
     ports:
-      - "5435:5432"  # External:Internal (avoiding conflict with other services)
+      - "5435:5432"
     volumes:
       - analytics_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,14 +20,14 @@ services:
     networks:
       - yushan-platform-network
 
-  # Redis Cache for Analytics Service (for caching aggregated metrics)
+  # Redis Cache for Analytics Service
   redis:
     image: redis:7-alpine
     container_name: yushan-analytics-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
-      - "6382:6379"  # External:Internal (avoiding conflict with other services)
+      - "6382:6379"
     volumes:
       - analytics_redis_data:/data
     healthcheck:
@@ -52,17 +52,18 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"  # Explicit memory limits
 
       # Database Configuration
       DB_USERNAME: ${DB_USERNAME:-yushan_analytics}
       DB_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
       DB_NAME: ${DB_NAME:-yushan_analytics}
       DB_HOST: postgres
-      DB_PORT: 5432  # ✅ FIXED - Use internal container port
+      DB_PORT: 5432
 
-      # Redis Configuration (for caching metrics)
+      # Redis Configuration
       REDIS_HOST: redis
-      REDIS_PORT: 6379  # ✅ FIXED - Use internal container port
+      REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
 
       # Eureka Configuration
@@ -76,6 +77,9 @@ services:
       ANALYTICS_AGGREGATION_INTERVAL: ${ANALYTICS_AGGREGATION_INTERVAL:-300}
       ANALYTICS_RETENTION_DAYS: ${ANALYTICS_RETENTION_DAYS:-90}
       ANALYTICS_CACHE_TTL: ${ANALYTICS_CACHE_TTL:-600}
+
+      # Disable Kafka if not using it yet
+      SPRING_KAFKA_ENABLED: false
     ports:
       - "8083:8083"
     networks:
@@ -85,7 +89,16 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 90s  # Increased start period
+    # Add memory limits to prevent OOM
+    mem_limit: 1g
+    mem_reservation: 512m
+    # Add logging driver to prevent log buildup
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   analytics_pg_data:
@@ -93,7 +106,6 @@ volumes:
   analytics_redis_data:
     driver: local
 
-# Connect to the existing Eureka network
 networks:
   yushan-platform-network:
     external: true
