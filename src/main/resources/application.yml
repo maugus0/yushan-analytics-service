@@ -11,7 +11,7 @@ spring:
 
   # Database Configuration
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:yushan_analytics}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5435}/${DB_NAME:yushan_analytics}
     username: ${DB_USERNAME:yushan_analytics}
     password: ${DB_PASSWORD:change_me_in_production}
     driver-class-name: org.postgresql.Driver
@@ -42,7 +42,7 @@ spring:
   data:
     redis:
       host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      port: ${REDIS_PORT:6382}
       password: ${REDIS_PASSWORD:}
       timeout: 60000
       jedis:

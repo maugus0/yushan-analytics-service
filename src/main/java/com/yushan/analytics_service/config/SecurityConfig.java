@@ -1,13 +1,11 @@
 package com.yushan.analytics_service.config;
 
-import com.yushan.analytics_service.security.CustomMethodSecurityExpressionHandler;
 import com.yushan.analytics_service.security.JwtAuthenticationEntryPoint;
 import com.yushan.analytics_service.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -18,7 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Security Configuration for Engagement Service.
+ * Security Configuration for Analytics Service.
  */
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
@@ -68,15 +66,14 @@ public class SecurityConfig {
                         // CORS preflight requests
                         .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
 
-                        // Comment APIs
-                        .requestMatchers(HttpMethod.GET, "/api/v1/comments/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/comments/**").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/comments/**").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/comments/**").authenticated()
+                        // History APIs - all require authentication
+                        .requestMatchers(HttpMethod.GET, "/api/history/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/history/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/history/**").authenticated()
 
                         // Admin endpoints
-                        .requestMatchers("/api/v1/comments/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/v1/*/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/history/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/*/admin/**").hasRole("ADMIN")
 
                         // All other requests require authentication
                         .anyRequest().authenticated()
@@ -93,8 +90,7 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    @Bean
-    public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
-        return new CustomMethodSecurityExpressionHandler();
-    }
+    // REMOVED: methodSecurityExpressionHandler() bean
+    // CustomMethodSecurityExpressionHandler is already registered as a @Component
+    // Having both causes a conflict
 }
