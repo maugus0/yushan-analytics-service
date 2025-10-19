@@ -1,59 +1,70 @@
+server:
+  port: ${SERVER_PORT:8083}
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+
 spring:
   application:
     name: analytics-service
 
+  # Database Configuration
   datasource:
-    url: jdbc:postgresql://localhost:5432/yushan_analytics
-    username: yushan_analytics
-    password: change_me_in_production
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:yushan_analytics}
+    username: ${DB_USERNAME:yushan_analytics}
+    password: ${DB_PASSWORD:change_me_in_production}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
       connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
 
-  # JPA/Hibernate Configuration - Disabled (using MyBatis only)
+  # JPA Configuration (disabled - using MyBatis)
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: false
 
   # Flyway Configuration
   flyway:
     enabled: true
-    locations: classpath:db/migration
     baseline-on-migrate: true
-    validate-on-migrate: true
+    locations: classpath:db/migration
+    schemas: public
 
-  # MyBatis Configuration
-  mybatis:
-    mapper-locations: classpath:/mapper/**Mapper.xml
-    type-aliases-package: com.yushan.analytics_service.entity
-    config-location: classpath:config/mybatis-config.xml
-
-  # Redis Configuration (I'll set this up later)
+  # Redis Configuration
   data:
     redis:
-      host: localhost
-      port: 6379
-      timeout: 2000ms
-      lettuce:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 60000
+      jedis:
         pool:
           max-active: 8
           max-idle: 8
-          min-idle: 2
+          min-idle: 0
+          max-wait: -1ms
 
-  # Kafka Configuration (Phase 2)
+  # Cache Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000 # 1 hour in milliseconds
+      cache-null-values: false
+
+  # Kafka Configuration
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: analytics-service
       auto-offset-reset: earliest
-      enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
@@ -62,30 +73,58 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
-# Server Configuration
-server:
-  port: 8083
-  servlet:
-    context-path: /
-  compression:
-    enabled: true
+# MyBatis Configuration
+mybatis:
+  type-aliases-package: com.yushan.analytics_service.entity
+  mapper-locations: classpath:mapper/**Mapper.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 30
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
-# Eureka Client Configuration
+# Eureka Configuration
 eureka:
   client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
-
   instance:
     prefer-ip-address: true
-    instance-id: ${spring.application.name}:${server.port}
     lease-renewal-interval-in-seconds: 30
     lease-expiration-duration-in-seconds: 90
-    metadata-map:
-      version: 1.0.0
-      description: Analytics and ranking service
+    hostname: ${HOSTNAME:localhost}
+    instance-id: ${spring.application.name}:${server.port}
+
+# OpenFeign Configuration
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 10000
+        loggerLevel: basic
+  circuitbreaker:
+    enabled: true
+
+# Service URLs for inter-service communication
+services:
+  content:
+    url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+    name: content-service
+  user:
+    url: ${USER_SERVICE_URL:http://localhost:8081}
+    name: user-service
+  gamification:
+    url: ${GAMIFICATION_SERVICE_URL:http://localhost:8085}
+    name: gamification-service
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:your-super-secret-jwt-key-change-this-in-production-must-be-at-least-256-bits}
+  expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
 
 # Actuator Configuration
 management:
@@ -96,17 +135,47 @@ management:
   endpoint:
     health:
       show-details: always
-  metrics:
-    tags:
-      application: ${spring.application.name}
 
 # Logging Configuration
 logging:
   level:
-    com.yushan.analytics: DEBUG
-    org.springframework.cloud: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    root: INFO
+    com.yushan.analytics_service: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: DEBUG
+    org.mybatis: DEBUG
+    com.yushan.analytics_service.dao: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/analytics-service.log
+
+# SpringDoc OpenAPI Configuration for Swagger
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    filter: true
+    display-request-duration: true
+    syntax-highlight:
+      activated: true
+  show-actuator: false
+  packages-to-scan: com.yushan.analytics_service.controller
+  paths-to-match: /api/**
+
+# Application-specific Configuration
+analytics:
+  history:
+    max-records-per-user: 1000
+  pagination:
+    default-page-size: 20
+    max-page-size: 100
+  ranking:
+    update-interval: 3600000 # 1 hour in milliseconds
