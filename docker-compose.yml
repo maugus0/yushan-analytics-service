@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
       POSTGRES_DB: ${DB_NAME:-yushan_analytics}
     ports:
-      - "5435:5432"
+      - "5435:5435"
     volumes:
       - analytics_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
-      - "6382:6379"
+      - "6382:6382"
     volumes:
       - analytics_redis_data:/data
     healthcheck:
@@ -54,16 +54,19 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"  # Explicit memory limits
 
+      # Config Server Configuration
+      CONFIG_SERVER_URI: http://yushan-config-server:8888
+
       # Database Configuration
       DB_USERNAME: ${DB_USERNAME:-yushan_analytics}
       DB_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
       DB_NAME: ${DB_NAME:-yushan_analytics}
       DB_HOST: postgres
-      DB_PORT: 5432
+      DB_PORT: 5435
 
       # Redis Configuration
       REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: 6382
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
 
       # Eureka Configuration
