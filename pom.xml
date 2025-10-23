@@ -415,7 +415,7 @@
                 <artifactId>dependency-check-maven</artifactId>
                 <version>11.1.0</version>
                 <configuration>
-                    <autoUpdate>true</autoUpdate>
+                    <autoUpdate>false</autoUpdate>
                     <dataDirectory>${project.build.directory}/dependency-check-data</dataDirectory>
                     <nvdApiServicesEnabled>false</nvdApiServicesEnabled>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
