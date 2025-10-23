@@ -376,25 +376,13 @@
             <plugin>
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
-                <version>11.1.0</version>
+                <version>9.0.9</version>
                 <configuration>
-                    <!-- Disable NVD API temporarily due to CVSS v4 parsing issues -->
-                    <nvdApiServicesEnabled>false</nvdApiServicesEnabled>
-                    <autoUpdate>false</autoUpdate>
-
-                    <!-- Keep OSS Index enabled for additional vulnerability data -->
+                    <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
                     <ossIndexServerId>ossindex</ossIndexServerId>
-
-                    <!-- Data directory -->
                     <dataDirectory>${user.home}/.m2/repository/org/owasp/dependency-check-data</dataDirectory>
-
-                    <!-- Report format -->
                     <format>ALL</format>
-
-                    <!-- Fail build threshold -->
                     <failBuildOnCVSS>10</failBuildOnCVSS>
-
-                    <!-- Suppressions file -->
                     <suppressionFile>dependency-check-suppressions.xml</suppressionFile>
                 </configuration>
             </plugin>
