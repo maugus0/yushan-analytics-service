@@ -417,6 +417,7 @@
                 <configuration>
                     <autoUpdate>true</autoUpdate>
                     <dataDirectory>${project.build.directory}/dependency-check-data</dataDirectory>
+                    <nvdApiServicesEnabled>false</nvdApiServicesEnabled>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
                 </configuration>
             </plugin>
