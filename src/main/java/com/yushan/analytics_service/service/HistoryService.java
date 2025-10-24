@@ -3,10 +3,10 @@ package com.yushan.analytics_service.service;
 import com.yushan.analytics_service.client.ContentServiceClient;
 import com.yushan.analytics_service.client.UserServiceClient;
 import com.yushan.analytics_service.dao.HistoryMapper;
-import com.yushan.analytics_service.dto.CategoryDTO;
+import com.yushan.analytics_service.dto.ApiResponse;
 import com.yushan.analytics_service.dto.ChapterDTO;
 import com.yushan.analytics_service.dto.HistoryResponseDTO;
-import com.yushan.analytics_service.dto.NovelDTO;
+import com.yushan.analytics_service.dto.NovelDetailResponseDTO;
 import com.yushan.analytics_service.dto.PageResponseDTO;
 import com.yushan.analytics_service.entity.History;
 import com.yushan.analytics_service.exception.ResourceNotFoundException;
@@ -48,20 +48,31 @@ public class HistoryService {
         }
 
         // Validate novel exists via Content Service
-        NovelDTO novel = contentServiceClient.getNovelById(novelId);
-        if (novel == null) {
+        try {
+            ApiResponse<NovelDetailResponseDTO> novelResponse = contentServiceClient.getNovelById(novelId);
+            if (novelResponse == null || !novelResponse.isSuccess() || novelResponse.getData() == null) {
+                throw new ResourceNotFoundException("Novel not found with id: " + novelId);
+            }
+        } catch (Exception e) {
             throw new ResourceNotFoundException("Novel not found with id: " + novelId);
         }
 
         // Validate chapter exists and belongs to novel
-        ChapterDTO chapter = contentServiceClient.getChapterById(chapterId);
-        if (chapter == null) {
+        try {
+            ApiResponse<List<ChapterDTO>> chapterResponse = contentServiceClient.getChaptersBatch(java.util.List.of(chapterId));
+            if (chapterResponse == null || !chapterResponse.isSuccess() || 
+                chapterResponse.getData() == null || chapterResponse.getData().isEmpty()) {
+                throw new ResourceNotFoundException("Chapter not found with id: " + chapterId);
+            }
+            ChapterDTO chapter = chapterResponse.getData().get(0);
+            if (!chapter.getNovelId().equals(novelId)) {
+                throw new ValidationException("Chapter doesn't belong to novel id: " + novelId);
+            }
+        } catch (ResourceNotFoundException | ValidationException e) {
+            throw e;
+        } catch (Exception e) {
             throw new ResourceNotFoundException("Chapter not found with id: " + chapterId);
         }
-        if (!chapter.getNovelId().equals(novelId)) {
-            throw new ValidationException("Chapter doesn't belong to novel id: " + novelId);
-        }
-
         History existingHistory = historyMapper.selectByUserAndNovel(userId, novelId);
 
         if (existingHistory != null) {
@@ -107,23 +118,37 @@ public class HistoryService {
                 .collect(Collectors.toList());
 
         // Fetch data from Content Service
-        List<NovelDTO> novels = contentServiceClient.getNovelsByIds(novelIds);
-        List<ChapterDTO> chapters = contentServiceClient.getChaptersByIds(chapterIds);
+        List<NovelDetailResponseDTO> novels = Collections.emptyList();
+        List<ChapterDTO> chapters = Collections.emptyList();
+        
+        try {
+            ApiResponse<List<NovelDetailResponseDTO>> novelResponse = contentServiceClient.getNovelsBatch(novelIds);
+            if (novelResponse != null && novelResponse.isSuccess() && novelResponse.getData() != null) {
+                novels = novelResponse.getData();
+            }
+        } catch (Exception e) {
+            // Log error but continue with empty list
+        }
+
+        try {
+            ApiResponse<List<ChapterDTO>> chapterResponse = contentServiceClient.getChaptersBatch(chapterIds);
+            if (chapterResponse != null && chapterResponse.isSuccess() && chapterResponse.getData() != null) {
+                chapters = chapterResponse.getData();
+            }
+        } catch (Exception e) {
+            // Log error but continue with empty list
+        }
 
         // Convert to maps for easy lookup
-        Map<Integer, NovelDTO> novelMap = novels.stream()
-                .collect(Collectors.toMap(NovelDTO::getId, n -> n));
+        Map<Integer, NovelDetailResponseDTO> novelMap = novels.stream()
+                .collect(Collectors.toMap(NovelDetailResponseDTO::getId, n -> n));
         Map<Integer, ChapterDTO> chapterMap = chapters.stream()
                 .collect(Collectors.toMap(ChapterDTO::getId, c -> c));
 
-        // Fetch categories
-        List<Integer> categoryIds = novels.stream()
-                .map(NovelDTO::getCategoryId)
-                .distinct()
-                .collect(Collectors.toList());
-        List<CategoryDTO> categories = contentServiceClient.getCategoriesByIds(categoryIds);
-        Map<Integer, CategoryDTO> categoryMap = categories.stream()
-                .collect(Collectors.toMap(CategoryDTO::getId, c -> c));
+        // Category names are already in NovelDetailResponseDTO, no need to fetch separately
+        Map<Integer, String> categoryMap = novels.stream()
+                .filter(n -> n.getCategoryId() != null && n.getCategoryName() != null)
+                .collect(Collectors.toMap(NovelDetailResponseDTO::getCategoryId, NovelDetailResponseDTO::getCategoryName, (a, b) -> a));
 
         // Check library status
         Map<Integer, Boolean> libraryStatusMap = libraryService.checkNovelsInLibrary(userId, novelIds);
@@ -156,9 +181,9 @@ public class HistoryService {
 
     private HistoryResponseDTO convertToRichDTO(
             History history,
-            Map<Integer, NovelDTO> novelMap,
+            Map<Integer, NovelDetailResponseDTO> novelMap,
             Map<Integer, ChapterDTO> chapterMap,
-            Map<Integer, CategoryDTO> categoryMap,
+            Map<Integer, String> categoryMap,
             Map<Integer, Boolean> libraryStatusMap) {
 
         HistoryResponseDTO dto = new HistoryResponseDTO();
@@ -167,18 +192,19 @@ public class HistoryService {
         dto.setNovelId(history.getNovelId());
         dto.setViewTime(history.getUpdateTime());
 
-        NovelDTO novel = novelMap.get(history.getNovelId());
+        NovelDetailResponseDTO novel = novelMap.get(history.getNovelId());
         if (novel != null) {
             dto.setNovelTitle(novel.getTitle());
             dto.setNovelCover(novel.getCoverImgUrl());
             dto.setSynopsis(novel.getSynopsis());
             dto.setAvgRating(novel.getAvgRating());
-            dto.setChapterCnt(novel.getChapterCnt());
+            // Note: chapterCnt is not in NovelDetailResponseDTO, set to null or fetch separately if needed
+            dto.setChapterCnt(null);
             dto.setCategoryId(novel.getCategoryId());
 
-            CategoryDTO category = categoryMap.get(novel.getCategoryId());
-            if (category != null) {
-                dto.setCategoryName(category.getName());
+            String categoryName = categoryMap.get(novel.getCategoryId());
+            if (categoryName != null) {
+                dto.setCategoryName(categoryName);
             }
         }
 

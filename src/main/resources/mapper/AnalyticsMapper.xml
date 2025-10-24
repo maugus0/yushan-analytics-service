@@ -1,6 +1,175 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
-<mapper namespace="com.yushan.analytics_service.dao.AnalyticsMapper" >
-    <!-- Analytics mapper queries will go here -->
-    <!-- This is a placeholder to prevent XML parsing errors -->
+<mapper namespace="com.yushan.analytics_service.dao.AnalyticsMapper">
+
+    <!-- User Activity Trends based on history table -->
+    <select id="getUserActivityTrends" resultType="com.yushan.analytics_service.dto.AnalyticsTrendResponseDTO$TrendDataPoint">
+        <choose>
+            <when test="period == 'daily'">
+                SELECT 
+                    DATE(update_time) as date,
+                    TO_CHAR(DATE(update_time), 'YYYY-MM-DD') as periodLabel,
+                    COUNT(DISTINCT user_id) as count,
+                    0.0 as growthRate
+                FROM history 
+                WHERE update_time BETWEEN #{startDate} AND #{endDate}
+                GROUP BY DATE(update_time)
+                ORDER BY DATE(update_time)
+            </when>
+            <when test="period == 'weekly'">
+                SELECT 
+                    DATE_TRUNC('week', update_time) as date,
+                    TO_CHAR(DATE_TRUNC('week', update_time), 'YYYY-"W"WW') as periodLabel,
+                    COUNT(DISTINCT user_id) as count,
+                    0.0 as growthRate
+                FROM history 
+                WHERE update_time BETWEEN #{startDate} AND #{endDate}
+                GROUP BY DATE_TRUNC('week', update_time)
+                ORDER BY DATE_TRUNC('week', update_time)
+            </when>
+            <when test="period == 'monthly'">
+                SELECT 
+                    DATE_TRUNC('month', update_time) as date,
+                    TO_CHAR(DATE_TRUNC('month', update_time), 'YYYY-MM') as periodLabel,
+                    COUNT(DISTINCT user_id) as count,
+                    0.0 as growthRate
+                FROM history 
+                WHERE update_time BETWEEN #{startDate} AND #{endDate}
+                GROUP BY DATE_TRUNC('month', update_time)
+                ORDER BY DATE_TRUNC('month', update_time)
+            </when>
+        </choose>
+    </select>
+
+    <!-- Reading Activity Trends -->
+    <select id="getReadingActivityTrends" resultType="com.yushan.analytics_service.dto.ReadingActivityResponseDTO$ActivityDataPoint">
+        <choose>
+            <when test="period == 'daily'">
+                SELECT 
+                    DATE(update_time) as date,
+                    TO_CHAR(DATE(update_time), 'YYYY-MM-DD') as periodLabel,
+                    COUNT(DISTINCT user_id) as views,
+                    COUNT(DISTINCT novel_id) as chaptersRead,
+                    0 as comments,
+                    0 as reviews,
+                    0 as votes,
+                    COUNT(*) as totalActivity
+                FROM history 
+                WHERE update_time BETWEEN #{startDate} AND #{endDate}
+                GROUP BY DATE(update_time)
+                ORDER BY DATE(update_time)
+            </when>
+            <when test="period == 'weekly'">
+                SELECT 
+                    DATE_TRUNC('week', update_time) as date,
+                    TO_CHAR(DATE_TRUNC('week', update_time), 'YYYY-"W"WW') as periodLabel,
+                    COUNT(DISTINCT user_id) as views,
+                    COUNT(DISTINCT novel_id) as chaptersRead,
+                    0 as comments,
+                    0 as reviews,
+                    0 as votes,
+                    COUNT(*) as totalActivity
+                FROM history 
+                WHERE update_time BETWEEN #{startDate} AND #{endDate}
+                GROUP BY DATE_TRUNC('week', update_time)
+                ORDER BY DATE_TRUNC('week', update_time)
+            </when>
+            <when test="period == 'monthly'">
+                SELECT 
+                    DATE_TRUNC('month', update_time) as date,
+                    TO_CHAR(DATE_TRUNC('month', update_time), 'YYYY-MM') as periodLabel,
+                    COUNT(DISTINCT user_id) as views,
+                    COUNT(DISTINCT novel_id) as chaptersRead,
+                    0 as comments,
+                    0 as reviews,
+                    0 as votes,
+                    COUNT(*) as totalActivity
+                FROM history 
+                WHERE update_time BETWEEN #{startDate} AND #{endDate}
+                GROUP BY DATE_TRUNC('month', update_time)
+                ORDER BY DATE_TRUNC('month', update_time)
+            </when>
+        </choose>
+    </select>
+
+    <!-- Active User Counts -->
+    <select id="getActiveUserCount" resultType="java.lang.Long">
+        SELECT COUNT(DISTINCT user_id) 
+        FROM history 
+        WHERE update_time BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+    <select id="getDailyActiveUsers" resultType="java.lang.Long">
+        SELECT COUNT(DISTINCT user_id) 
+        FROM history 
+        WHERE DATE(update_time) = DATE(#{date})
+    </select>
+
+    <select id="getWeeklyActiveUsers" resultType="java.lang.Long">
+        SELECT COUNT(DISTINCT user_id) 
+        FROM history 
+        WHERE update_time BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+    <select id="getMonthlyActiveUsers" resultType="java.lang.Long">
+        SELECT COUNT(DISTINCT user_id) 
+        FROM history 
+        WHERE update_time BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+    <!-- Hourly Active Users Breakdown -->
+    <select id="getHourlyActiveUsers" resultType="com.yushan.analytics_service.dto.DailyActiveUsersResponseDTO$ActivityDataPoint">
+        SELECT 
+            EXTRACT(HOUR FROM update_time)::INTEGER as hour,
+            COUNT(DISTINCT user_id) as activeUsers,
+            0 as newUsers,
+            COUNT(*) as readingSessions
+        FROM history 
+        WHERE DATE(update_time) = DATE(#{date})
+        GROUP BY EXTRACT(HOUR FROM update_time)
+        ORDER BY hour
+    </select>
+
+    <!-- Unique Novels Read -->
+    <select id="getUniqueNovelsRead" resultType="java.lang.Long">
+        SELECT COUNT(DISTINCT novel_id) 
+        FROM history 
+        WHERE update_time BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+    <!-- Total Reading Sessions -->
+    <select id="getTotalReadingSessions" resultType="java.lang.Long">
+        SELECT COUNT(*) 
+        FROM history 
+        WHERE update_time BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+    <!-- Most Read Novels (all time) -->
+    <select id="getMostReadNovelIds" resultType="java.lang.Integer">
+        SELECT novel_id
+        FROM history
+        GROUP BY novel_id
+        ORDER BY COUNT(*) DESC, MAX(update_time) DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- Most Active Users (all time) -->
+    <select id="getMostActiveUserIds" resultType="java.util.UUID">
+        SELECT user_id
+        FROM history
+        GROUP BY user_id
+        ORDER BY COUNT(*) DESC, MAX(update_time) DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- Most Read Novels in Date Range -->
+    <select id="getMostReadNovelIdsByDateRange" resultType="java.lang.Integer">
+        SELECT novel_id
+        FROM history
+        WHERE update_time BETWEEN #{startDate} AND #{endDate}
+        GROUP BY novel_id
+        ORDER BY COUNT(*) DESC, MAX(update_time) DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

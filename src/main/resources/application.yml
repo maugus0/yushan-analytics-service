@@ -98,6 +98,12 @@ services:
   content:
     name: ${CONTENT_SERVICE_NAME:content-service}
     url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+  engagement:
+    name: ${ENGAGEMENT_SERVICE_NAME:engagement-service}
+    url: ${ENGAGEMENT_SERVICE_URL:http://localhost:8084}
+  gamification:
+    name: ${GAMIFICATION_SERVICE_NAME:gamification-service}
+    url: ${GAMIFICATION_SERVICE_URL:http://localhost:8085}
 
 # Analytics Configuration - ADD THIS SECTION
 analytics:

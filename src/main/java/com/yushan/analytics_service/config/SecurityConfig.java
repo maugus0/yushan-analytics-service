@@ -68,12 +68,16 @@ public class SecurityConfig {
                         // CORS preflight requests
                         .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
 
+                        // Ranking APIs - public access
+                        .requestMatchers(HttpMethod.GET, "/api/v1/ranking/**").permitAll()
+
                         // History APIs - all require authentication
                         .requestMatchers(HttpMethod.GET, "/api/history/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/history/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/history/**").authenticated()
 
-                        // Admin endpoints
+                        // Admin endpoints - MUST come before general auth rules
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/history/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/*/admin/**").hasRole("ADMIN")
 

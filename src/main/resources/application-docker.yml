@@ -94,10 +94,16 @@ jwt:
 services:
   user:
     name: ${USER_SERVICE_NAME:user-service}
-    url: ${USER_SERVICE_URL:http://yushan-user-service:8080}
+    url: ${USER_SERVICE_URL:http://yushan-user-service:8081}
   content:
     name: ${CONTENT_SERVICE_NAME:content-service}
-    url: ${CONTENT_SERVICE_URL:http://yushan-content-service:8080}
+    url: ${CONTENT_SERVICE_URL:http://yushan-content-service:8082}
+  engagement:
+    name: ${ENGAGEMENT_SERVICE_NAME:engagement-service}
+    url: ${ENGAGEMENT_SERVICE_URL:http://yushan-engagement-service:8084}
+  gamification:
+    name: ${GAMIFICATION_SERVICE_NAME:gamification-service}
+    url: ${GAMIFICATION_SERVICE_URL:http://yushan-gamification-service:8085}
 
 # Analytics Configuration
 analytics:
