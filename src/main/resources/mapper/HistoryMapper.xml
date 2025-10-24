@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.yushan.analytics_service.dao.HistoryMapper" >
+    <!-- Use result mapping instead of constructor -->
     <resultMap id="BaseResultMap" type="com.yushan.analytics_service.entity.History" >
-        <constructor >
-            <idArg column="id" jdbcType="INTEGER" javaType="java.lang.Integer" />
-            <arg column="uuid" jdbcType="OTHER" javaType="java.util.UUID" />
-            <arg column="user_id" jdbcType="OTHER" javaType="java.util.UUID" />
-            <arg column="novel_id" jdbcType="INTEGER" javaType="java.lang.Integer" />
-            <arg column="chapter_id" jdbcType="INTEGER" javaType="java.lang.Integer" />
-            <arg column="create_time" jdbcType="TIMESTAMP" javaType="java.util.Date" />
-            <arg column="update_time" jdbcType="TIMESTAMP" javaType="java.util.Date" />
-        </constructor>
+        <id column="id" property="id" jdbcType="INTEGER" />
+        <result column="uuid" property="uuid" jdbcType="OTHER" />
+        <result column="user_id" property="userId" jdbcType="OTHER" />
+        <result column="novel_id" property="novelId" jdbcType="INTEGER" />
+        <result column="chapter_id" property="chapterId" jdbcType="INTEGER" />
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
     </resultMap>
 
     <sql id="Base_Column_List" >
@@ -56,7 +55,7 @@
                 chapter_id,
             </if>
             create_time,
-            update_time,
+            update_time
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides="," >
             <if test="id != null" >
@@ -121,7 +120,6 @@
         and novel_id = #{novelId,jdbcType=INTEGER}
     </select>
 
-    <!-- FIXED: Removed JOIN with novel table - filtering will be done in service layer via Content Service -->
     <select id="selectByUserIdWithPagination" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List" />
         FROM history
@@ -130,7 +128,6 @@
         LIMIT #{size,jdbcType=INTEGER} OFFSET #{offset}
     </select>
 
-    <!-- FIXED: Removed JOIN with novel table -->
     <select id="countByUserId" resultType="long">
         SELECT COUNT(id)
         FROM history
