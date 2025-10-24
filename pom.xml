@@ -270,6 +270,21 @@
 				</configuration>
 			</plugin>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<argLine>
+						-XX:+EnableDynamicAgentLoading
+						-Djdk.attach.allowAttachSelf=true
+					</argLine>
+					<systemPropertyVariables>
+						<spring.cloud.config.enabled>false</spring.cloud.config.enabled>
+						<spring.cloud.config.import-check.enabled>false</spring.cloud.config.import-check.enabled>
+						<spring.cloud.bootstrap.enabled>false</spring.cloud.bootstrap.enabled>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
@@ -320,6 +335,7 @@
                     <threshold>Medium</threshold>
                     <xmlOutput>true</xmlOutput>
                     <failOnError>true</failOnError>
+                    <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
                 </configuration>
                 <executions>
                     <execution>

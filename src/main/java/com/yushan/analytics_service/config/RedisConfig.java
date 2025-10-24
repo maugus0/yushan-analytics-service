@@ -29,15 +29,14 @@ public class RedisConfig {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
-        // Configure Jackson2JsonRedisSerializer
-        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = 
-            new Jackson2JsonRedisSerializer<>(Object.class);
-        
+        // Configure ObjectMapper
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
         objectMapper.activateDefaultTyping(LaissezFaireSubTypeValidator.instance, ObjectMapper.DefaultTyping.NON_FINAL);
         
-        jackson2JsonRedisSerializer.setObjectMapper(objectMapper);
+        // Configure Jackson2JsonRedisSerializer with ObjectMapper
+        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = 
+            new Jackson2JsonRedisSerializer<>(objectMapper, Object.class);
 
         // Configure StringRedisSerializer for keys
         StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();

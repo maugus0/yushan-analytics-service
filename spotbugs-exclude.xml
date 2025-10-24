@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Exclude unused field warnings for Feign client DTOs - fields are used by Jackson for deserialization -->
+    <Match>
+        <Class name="~com\.yushan\.analytics_service\.client\..*\$.*"/>
+        <Bug pattern="UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+    
+    <!-- Exclude unwritten field warning for ModerationStatistics.totalComments - field is written by Jackson -->
+    <Match>
+        <Class name="com.yushan.analytics_service.client.EngagementServiceClient$ModerationStatistics"/>
+        <Field name="totalComments"/>
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+</FindBugsFilter>
+

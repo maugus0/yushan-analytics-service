@@ -347,4 +347,56 @@ public class RedisUtil {
             delete(allKeys);
         }
     }
+
+    // Sorted Set (ZSet) operations for ranking
+
+    /**
+     * Add member to sorted set with score
+     */
+    public Boolean zAdd(String key, String member, double score) {
+        return redisTemplate.opsForZSet().add(key, member, score);
+    }
+
+    /**
+     * Get the cardinality (number of elements) of a sorted set
+     */
+    public Long zCard(String key) {
+        return redisTemplate.opsForZSet().zCard(key);
+    }
+
+    /**
+     * Get elements from sorted set in reverse order (highest score first)
+     */
+    public Set<String> zReverseRange(String key, long start, long end) {
+        Set<Object> result = redisTemplate.opsForZSet().reverseRange(key, start, end);
+        if (result == null) {
+            return null;
+        }
+        return result.stream()
+                .map(Object::toString)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    /**
+     * Get the rank of member in sorted set (reverse order, highest score = rank 0)
+     */
+    public Long zReverseRank(String key, String member) {
+        return redisTemplate.opsForZSet().reverseRank(key, member);
+    }
+
+    /**
+     * Get the score of a member in sorted set
+     */
+    public Double zScore(String key, String member) {
+        return redisTemplate.opsForZSet().score(key, member);
+    }
+
+    /**
+     * Delete multiple keys by collection
+     */
+    public void delete(java.util.Collection<String> keys) {
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
+    }
 }

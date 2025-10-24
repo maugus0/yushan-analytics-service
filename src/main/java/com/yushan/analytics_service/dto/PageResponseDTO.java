@@ -42,7 +42,7 @@ public class PageResponseDTO<T> {
     }
 
     public static <T> PageResponseDTO<T> of(List<T> content, long totalElements, int currentPage, int size) {
-        return new PageResponseDTO(content, totalElements, currentPage, size);
+        return new PageResponseDTO<>(content, totalElements, currentPage, size);
     }
 
     // All-args constructor for Lombok compatibility
