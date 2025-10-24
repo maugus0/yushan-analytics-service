@@ -2,18 +2,15 @@ spring:
   application:
     name: analytics-service
 
-  # Configuration will be loaded from Config Server
-  # Local configuration for development/testing only
-  config:
-    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
-
+  # Disable Config Server for Docker
   cloud:
     config:
-      enabled: ${SPRING_CLOUD_CONFIG_ENABLED:true}
-      fail-fast: false  # Changed to false so it can start without config server
+      enabled: false
+      fail-fast: false
 
+  # Database Configuration
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/yushan_analytics}
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:yushan_analytics}
     username: ${DB_USERNAME:yushan_analytics}
     password: ${DB_PASSWORD:ahanj123}
     driver-class-name: org.postgresql.Driver
@@ -22,10 +19,10 @@ spring:
       minimum-idle: 5
       connection-timeout: 20000
 
-  # JPA/Hibernate Configuration - Disabled (using MyBatis only)
+  # JPA Configuration
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: validate  # Use validate in Docker, Flyway manages schema
     show-sql: false
     properties:
       hibernate:
@@ -34,10 +31,10 @@ spring:
 
   # Flyway Configuration
   flyway:
-    enabled: ${FLYWAY_ENABLED:true}
-    locations: classpath:db/migration
+    enabled: true
     baseline-on-migrate: true
     validate-on-migrate: true
+    locations: classpath:db/migration
 
   # MyBatis Configuration
   mybatis:
@@ -48,13 +45,16 @@ spring:
   # Redis Configuration
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
 
-  # Kafka Configuration (if used)
+  cache:
+    type: redis
+
+  # Kafka Configuration
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     enabled: ${SPRING_KAFKA_ENABLED:false}
 
 # Server Configuration
@@ -69,10 +69,10 @@ server:
 eureka:
   client:
     enabled: ${EUREKA_CLIENT_ENABLED:true}
-    serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
-    fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://yushan-eureka-registry:8761/eureka/}
     register-with-eureka: true
+    fetch-registry: true
 
   instance:
     prefer-ip-address: true
@@ -83,23 +83,23 @@ eureka:
       version: 1.0.0
       description: Analytics and ranking service
 
-# JWT Configuration - ADD THIS SECTION
+# JWT Configuration
 jwt:
-  secret: ${JWT_SECRET:your-secret-key-for-jwt-token-generation-and-validation-minimum-256-bits}
-  issuer: ${JWT_ISSUER:yushan-micro-service}
+  secret: ${JWT_SECRET:docker-secret-key-for-jwt-token-generation-and-validation-minimum-256-bits}
+  issuer: ${JWT_ISSUER:yushan-docker-service}
   algorithm: ${JWT_ALGORITHM:HS256}
   expiration: ${JWT_EXPIRATION:86400000}
 
-# Service URLs for Feign Clients - ADD THIS SECTION
+# Service URLs for Feign Clients - Use container names
 services:
   user:
     name: ${USER_SERVICE_NAME:user-service}
-    url: ${USER_SERVICE_URL:http://localhost:8081}
+    url: ${USER_SERVICE_URL:http://yushan-user-service:8080}
   content:
     name: ${CONTENT_SERVICE_NAME:content-service}
-    url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+    url: ${CONTENT_SERVICE_URL:http://yushan-content-service:8080}
 
-# Analytics Configuration - ADD THIS SECTION
+# Analytics Configuration
 analytics:
   aggregation:
     batch-size: ${ANALYTICS_BATCH_SIZE:1000}
@@ -128,10 +128,9 @@ management:
 # Logging Configuration
 logging:
   level:
-    com.yushan.analytics: DEBUG
-    org.springframework.cloud: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.yushan.analytics: INFO  # Changed to INFO for Docker to reduce noise
+    org.springframework.cloud: WARN
+    org.springframework.security: WARN
+    org.hibernate.SQL: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

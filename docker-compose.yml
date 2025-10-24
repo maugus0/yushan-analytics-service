@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
       POSTGRES_DB: ${DB_NAME:-yushan_analytics}
     ports:
-      - "5435:5435"
+      - "5435:5432"  # FIXED: External:Internal mapping
     volumes:
       - analytics_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
-      - "6382:6382"
+      - "6382:6379"  # FIXED: External:Internal mapping
     volumes:
       - analytics_redis_data:/data
     healthcheck:
@@ -52,28 +52,41 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"  # Explicit memory limits
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"
 
-      # Config Server Configuration
-      CONFIG_SERVER_URI: http://yushan-config-server:8888
+      # Config Server Configuration - DISABLED
+      SPRING_CLOUD_CONFIG_ENABLED: false
 
       # Database Configuration
       DB_USERNAME: ${DB_USERNAME:-yushan_analytics}
       DB_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
       DB_NAME: ${DB_NAME:-yushan_analytics}
       DB_HOST: postgres
-      DB_PORT: 5435
+      DB_PORT: 5432  # FIXED: Use internal port
 
       # Redis Configuration
       REDIS_HOST: redis
-      REDIS_PORT: 6382
+      REDIS_PORT: 6379  # FIXED: Use internal port
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
 
       # Eureka Configuration
+      EUREKA_CLIENT_ENABLED: true
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://yushan-eureka-registry:8761/eureka/
 
       # Server Configuration
       SERVER_PORT: 8083
+
+      # JWT Configuration - ADD THIS
+      JWT_SECRET: my-super-secret-jwt-key-for-production-use-minimum-256-bits-long
+      JWT_ISSUER: yushan-microservices
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION: 86400000
+
+      # Service URLs - ADD THIS
+      USER_SERVICE_NAME: user-service
+      USER_SERVICE_URL: http://yushan-user-service:8080
+      CONTENT_SERVICE_NAME: content-service
+      CONTENT_SERVICE_URL: http://yushan-content-service:8080
 
       # Analytics-specific Configuration
       ANALYTICS_BATCH_SIZE: ${ANALYTICS_BATCH_SIZE:-1000}
@@ -83,6 +96,7 @@ services:
 
       # Disable Kafka if not using it yet
       SPRING_KAFKA_ENABLED: false
+
     ports:
       - "8083:8083"
     networks:
@@ -92,11 +106,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s  # Increased start period
-    # Add memory limits to prevent OOM
+      start_period: 90s
     mem_limit: 1g
     mem_reservation: 512m
-    # Add logging driver to prevent log buildup
     logging:
       driver: "json-file"
       options:
