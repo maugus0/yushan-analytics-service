@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USERNAME:-yushan_analytics}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ahanj123}
       POSTGRES_DB: ${DB_NAME:-yushan_analytics}
     ports:
       - "5435:5432"  # FIXED: External:Internal mapping
@@ -59,7 +59,7 @@ services:
 
       # Database Configuration
       DB_USERNAME: ${DB_USERNAME:-yushan_analytics}
-      DB_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
+      DB_PASSWORD: ${DB_PASSWORD:-ahanj123}
       DB_NAME: ${DB_NAME:-yushan_analytics}
       DB_HOST: postgres
       DB_PORT: 5432  # FIXED: Use internal port
