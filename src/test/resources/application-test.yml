@@ -1,74 +1,54 @@
-# Test Configuration for Analytics Service
-# This file overrides production config for testing
-
 spring:
-  application:
-    name: analytics-service
-
-  # Test Database Configuration
   datasource:
     url: jdbc:h2:mem:testdb
     driver-class-name: org.h2.Driver
     username: sa
     password:
-
-  # Disable JPA for tests
+  
   jpa:
     hibernate:
       ddl-auto: create-drop
-    show-sql: false
-
-  # Disable Flyway for tests
+    database-platform: org.hibernate.dialect.H2Dialect
+  
   flyway:
     enabled: false
 
-  # MyBatis Configuration
-  mybatis:
-    mapper-locations: classpath:mapper/*.xml
-    type-aliases-package: com.yushan.analytics_service.entity
+  cloud:
+    discovery:
+      enabled: false
+    config:
+      enabled: false
+      discovery:
+        enabled: false
 
-  # Test Redis Configuration
-  data:
-    redis:
-      host: localhost
-      port: 6379
+  security:
+    enabled: false
 
-  # Test Kafka Configuration
-  kafka:
-    bootstrap-servers: localhost:9092
-
-# Server Configuration
-server:
-  port: 0  # Random port for tests
-
-# Disable Eureka for tests
 eureka:
   client:
     enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+  instance:
+    hostname: localhost
 
-# JWT Configuration for tests
+services:
+  user:
+    name: user-service
+    url: http://localhost:8081
+  content:
+    name: content-service
+    url: http://localhost:8082
+  engagement:
+    url: http://localhost:8084
+
 jwt:
-  secret: test-secret-key-for-jwt-token-generation-and-validation-2024
+  secret: testSecretKeyForTestingPurposesOnly123456789012345678901234567890
   issuer: test-micro-service
   algorithm: HS256
   expiration: 3600000
 
-# Analytics Configuration for tests
-analytics:
-  aggregation:
-    batch-size: 100
-    interval: 60
-  retention:
-    raw-data-days: 7
-    aggregated-data-days: 90
-  cache:
-    ttl: 300
-  reports:
-    max-page-size: 1000
-
-# Logging Configuration
 logging:
   level:
-    com.yushan.analytics: DEBUG
-    org.springframework.cloud: WARN
-    org.springframework.security: WARN
+    root: ERROR
+    com.yushan: ERROR

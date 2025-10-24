@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: analytics-service
+
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+
+logging:
+  level:
+    org.springframework.cloud.config: WARN
+    org.springframework.boot.context.config: WARN
+

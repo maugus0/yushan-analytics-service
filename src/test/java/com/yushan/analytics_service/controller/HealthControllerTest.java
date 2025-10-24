@@ -4,12 +4,15 @@ import com.yushan.analytics_service.client.ContentServiceClient;
 import com.yushan.analytics_service.client.EngagementServiceClient;
 import com.yushan.analytics_service.client.GamificationServiceClient;
 import com.yushan.analytics_service.client.UserServiceClient;
+import com.yushan.analytics_service.config.TestSecurityConfig;
 import com.yushan.analytics_service.util.JwtUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -17,6 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(HealthController.class)
+@Import(TestSecurityConfig.class)
 @ActiveProfiles("test")
 class HealthControllerTest {
 
@@ -42,24 +46,26 @@ class HealthControllerTest {
     private GamificationServiceClient gamificationServiceClient;
 
     @Test
+    @WithMockUser(username = "test-user", roles = {"USER"})
     void testHealth_Success() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.message").value("Analytics Service is healthy"))
-                .andExpect(jsonPath("$.data.status").value("UP"))
-                .andExpect(jsonPath("$.data.service").value("analytics-service"))
-                .andExpect(jsonPath("$.data.timestamp").exists());
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.service").value("analytics-service"))
+                .andExpect(jsonPath("$.message").value("Analytics Service is running!"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     @Test
+    @WithMockUser(username = "test-user", roles = {"USER"})
     void testHealth_ReturnsCorrectStructure() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").isNumber())
+                .andExpect(jsonPath("$.status").isString())
+                .andExpect(jsonPath("$.service").isString())
                 .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.data").isMap())
-                .andExpect(jsonPath("$.timestamp").exists());
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value("UP"));
     }
 }
 

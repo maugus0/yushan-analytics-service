@@ -88,7 +88,8 @@ class RankingServiceTest {
     @Test
     void testGetBestNovelRank_Success() {
         ApiResponse<NovelDetailResponseDTO> response = new ApiResponse<>();
-        response.setCode(0);
+        response.setCode(200);
+        response.setSuccess(true);
         response.setData(novelDTO);
         when(contentServiceClient.getNovelById(1)).thenReturn(response);
         when(redisUtil.zReverseRank(anyString(), anyString())).thenReturn(0L);
