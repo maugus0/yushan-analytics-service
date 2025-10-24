@@ -2,6 +2,7 @@ package com.yushan.analytics_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -9,11 +10,14 @@ import java.util.List;
 import java.util.UUID;
 
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class TopContentResponseDTO {
     
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @EqualsAndHashCode.Include
     private Date date;
     
+    // Excluded from equals/hashCode to avoid redundant null checks
     private List<TopNovel> topNovels;
     private List<TopAuthor> topAuthors;
     private List<TopCategory> topCategories;

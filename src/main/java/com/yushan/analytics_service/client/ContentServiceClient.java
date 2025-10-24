@@ -69,6 +69,8 @@ public interface ContentServiceClient {
     ApiResponse<List<ChapterDTO>> getChaptersBatch(@RequestBody List<Integer> chapterIds);
     
     // Nested class for category statistics
+    // Fields are used by Jackson for deserialization
+    @SuppressWarnings({"unused", "checkstyle:VisibilityModifier"})
     class CategoryStatistics {
         public Integer novelCount;
         public Integer totalViews;

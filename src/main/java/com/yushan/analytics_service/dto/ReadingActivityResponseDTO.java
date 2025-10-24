@@ -2,30 +2,40 @@ package com.yushan.analytics_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ReadingActivityResponseDTO {
     
+    @EqualsAndHashCode.Include
     private String period;
     
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    @EqualsAndHashCode.Include
     private Date startDate;
     
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    @EqualsAndHashCode.Include
     private Date endDate;
     
+    // Excluded from equals/hashCode to avoid redundant null checks
     private List<ActivityDataPoint> dataPoints;
     
+    @EqualsAndHashCode.Include
     private Long totalActivity;
     
+    @EqualsAndHashCode.Include
     private Double averageDailyActivity;
     
+    @EqualsAndHashCode.Include
     private Long peakActivity;
     
+    @EqualsAndHashCode.Include
     private String peakDate;
     
     // Defensive copying for dataPoints

@@ -31,7 +31,8 @@ public interface EngagementServiceClient {
     @GetMapping("/api/v1/comments/admin/statistics")
     ApiResponse<ModerationStatistics> getModerationStatistics();
 
-    // Nested classes for response types
+    // Nested classes for response types - fields are used by Jackson for deserialization
+    @SuppressWarnings({"unused", "checkstyle:VisibilityModifier"})
     class RatingStats {
         public Double averageRating;
         public Integer totalReviews;
@@ -42,6 +43,7 @@ public interface EngagementServiceClient {
         public Integer rating5Count;
     }
 
+    @SuppressWarnings({"unused", "checkstyle:VisibilityModifier"})
     class Review {
         public Integer id;
         public Integer novelId;
@@ -52,12 +54,14 @@ public interface EngagementServiceClient {
         public String createTime;
     }
 
+    @SuppressWarnings({"unused", "checkstyle:VisibilityModifier"})
     class CommentStatistics {
         public Integer totalComments;
         public Integer spoilerComments;
         public Integer recentComments;
     }
 
+    @SuppressWarnings({"unused", "checkstyle:VisibilityModifier"})
     class ModerationStatistics {
         public Long totalComments;
         public Long pendingReports;
