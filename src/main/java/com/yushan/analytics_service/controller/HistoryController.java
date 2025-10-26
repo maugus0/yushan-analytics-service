@@ -23,7 +23,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/history")
-@CrossOrigin(origins = "*")
 public class HistoryController {
 
     @Autowired

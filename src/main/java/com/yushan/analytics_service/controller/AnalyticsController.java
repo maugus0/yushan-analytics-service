@@ -24,7 +24,6 @@ import java.util.Date;
 
 @RestController
 @RequestMapping("/api/v1/admin/analytics")
-@CrossOrigin(origins = "*")
 @Tag(name = "Analytics (Admin)", description = "Admin analytics APIs for platform insights and metrics")
 public class AnalyticsController {
 
