@@ -45,6 +45,25 @@ spring:
     type-aliases-package: com.yushan.analytics_service.entity
     config-location: classpath:config/mybatis-config.xml
 
+  # Actuator Configuration for Prometheus Metrics
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,info,prometheus,metrics
+    endpoint:
+      prometheus:
+        enabled: true
+      health:
+        show-details: always
+    metrics:
+      export:
+        prometheus:
+          enabled: true
+      tags:
+        application: analytics-service
+        environment: production
+
   # Redis Configuration
   data:
     redis:
