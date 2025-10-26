@@ -46,7 +46,6 @@ class RankingServiceTest {
         userDTO = new UserProfileResponseDTO();
         userDTO.setUuid(UUID.randomUUID().toString());
         userDTO.setUsername("testuser");
-        userDTO.setExp(5000);
     }
 
     @Test
@@ -56,7 +55,7 @@ class RankingServiceTest {
         when(redisUtil.zReverseRange(anyString(), anyLong(), anyLong())).thenReturn(novelIds);
 
         ApiResponse<List<NovelDetailResponseDTO>> response = new ApiResponse<>();
-        response.setCode(0);
+        response.setCode(200);
         response.setData(Arrays.asList(novelDTO));
         when(contentServiceClient.getNovelsBatch(anyList())).thenReturn(response);
 
@@ -74,7 +73,7 @@ class RankingServiceTest {
         when(redisUtil.zReverseRange(anyString(), anyLong(), anyLong())).thenReturn(userUuids);
 
         ApiResponse<List<UserProfileResponseDTO>> response = new ApiResponse<>();
-        response.setCode(0);
+        response.setCode(200);
         response.setData(Arrays.asList(userDTO));
         when(userServiceClient.getUsersBatch(anyList())).thenReturn(response);
 
@@ -89,7 +88,6 @@ class RankingServiceTest {
     void testGetBestNovelRank_Success() {
         ApiResponse<NovelDetailResponseDTO> response = new ApiResponse<>();
         response.setCode(200);
-        response.setSuccess(true);
         response.setData(novelDTO);
         when(contentServiceClient.getNovelById(1)).thenReturn(response);
         when(redisUtil.zReverseRank(anyString(), anyString())).thenReturn(0L);

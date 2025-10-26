@@ -50,7 +50,7 @@ public class HistoryService {
         // Validate novel exists via Content Service
         try {
             ApiResponse<NovelDetailResponseDTO> novelResponse = contentServiceClient.getNovelById(novelId);
-            if (novelResponse == null || !novelResponse.isSuccess() || novelResponse.getData() == null) {
+            if (novelResponse == null || novelResponse.getCode() == null || !novelResponse.getCode().equals(200) || novelResponse.getData() == null) {
                 throw new ResourceNotFoundException("Novel not found with id: " + novelId);
             }
         } catch (Exception e) {
@@ -60,7 +60,7 @@ public class HistoryService {
         // Validate chapter exists and belongs to novel
         try {
             ApiResponse<List<ChapterDTO>> chapterResponse = contentServiceClient.getChaptersBatch(java.util.List.of(chapterId));
-            if (chapterResponse == null || !chapterResponse.isSuccess() || 
+            if (chapterResponse == null || chapterResponse.getCode() == null || !chapterResponse.getCode().equals(200) || 
                 chapterResponse.getData() == null || chapterResponse.getData().isEmpty()) {
                 throw new ResourceNotFoundException("Chapter not found with id: " + chapterId);
             }
@@ -123,7 +123,7 @@ public class HistoryService {
         
         try {
             ApiResponse<List<NovelDetailResponseDTO>> novelResponse = contentServiceClient.getNovelsBatch(novelIds);
-            if (novelResponse != null && novelResponse.isSuccess() && novelResponse.getData() != null) {
+            if (novelResponse != null && novelResponse.getCode() != null && novelResponse.getCode().equals(200) && novelResponse.getData() != null) {
                 novels = novelResponse.getData();
             }
         } catch (Exception e) {
@@ -132,7 +132,7 @@ public class HistoryService {
 
         try {
             ApiResponse<List<ChapterDTO>> chapterResponse = contentServiceClient.getChaptersBatch(chapterIds);
-            if (chapterResponse != null && chapterResponse.isSuccess() && chapterResponse.getData() != null) {
+            if (chapterResponse != null && chapterResponse.getCode() != null && chapterResponse.getCode().equals(200) && chapterResponse.getData() != null) {
                 chapters = chapterResponse.getData();
             }
         } catch (Exception e) {

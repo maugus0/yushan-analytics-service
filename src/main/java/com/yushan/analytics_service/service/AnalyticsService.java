@@ -197,7 +197,7 @@ public class AnalyticsService {
         try {
             ApiResponse<EngagementServiceClient.ModerationStatistics> stats = 
                     engagementServiceClient.getModerationStatistics();
-            if (stats != null && stats.isSuccess() && stats.getData() != null) {
+            if (stats != null && stats.getCode() != null && stats.getCode().equals(200) && stats.getData() != null) {
                 response.setTotalComments(stats.getData().totalComments);
                 // Reviews count would need a separate endpoint
                 response.setTotalReviews(0L);
@@ -244,7 +244,7 @@ public class AnalyticsService {
         // Get total novels from content service
         try {
             ApiResponse<Long> novelCountResponse = contentServiceClient.getNovelCount();
-            if (novelCountResponse != null && novelCountResponse.isSuccess() && novelCountResponse.getData() != null) {
+            if (novelCountResponse != null && novelCountResponse.getCode() != null && novelCountResponse.getCode().equals(200) && novelCountResponse.getData() != null) {
                 response.setTotalNovels(novelCountResponse.getData());
             } else {
                 response.setTotalNovels(0L);
@@ -258,7 +258,7 @@ public class AnalyticsService {
         try {
             ApiResponse<EngagementServiceClient.ModerationStatistics> stats = 
                     engagementServiceClient.getModerationStatistics();
-            if (stats != null && stats.isSuccess() && stats.getData() != null) {
+            if (stats != null && stats.getCode() != null && stats.getCode().equals(200) && stats.getData() != null) {
                 response.setTotalComments(stats.getData().totalComments);
             } else {
                 response.setTotalComments(0L);
@@ -326,7 +326,7 @@ public class AnalyticsService {
             try {
                 ApiResponse<List<NovelDetailResponseDTO>> novelsResponse = 
                     contentServiceClient.getNovelsBatch(topNovelIds);
-                if (novelsResponse != null && novelsResponse.isSuccess() && novelsResponse.getData() != null) {
+                if (novelsResponse != null && novelsResponse.getCode() != null && novelsResponse.getCode().equals(200) && novelsResponse.getData() != null) {
                     topNovels = novelsResponse.getData().stream()
                         .map(this::convertToTopNovel)
                         .toList();
