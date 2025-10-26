@@ -17,7 +17,6 @@ import java.util.Map;
 @Tag(name = "Test Utilities", description = "Test APIs for generating JWT tokens (Development only)")
 @RestController
 @RequestMapping("/api/test")
-@CrossOrigin(origins = "*")
 public class TestController {
 
     @Autowired

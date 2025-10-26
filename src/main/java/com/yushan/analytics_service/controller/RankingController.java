@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/ranking")
-@CrossOrigin(origins = "*")
 @Tag(name = "Ranking", description = "Ranking APIs for novels, users, and authors")
 public class RankingController {
 
