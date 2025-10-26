@@ -79,17 +79,18 @@ class RankingServiceTest {
 
     @Test
     void testRankUser_Success() {
+        // Mock Redis responses
+        when(redisUtil.zCard(anyString())).thenReturn(1L);
+        Set<String> userUuids = new LinkedHashSet<>();
+        userUuids.add(userDTO.getUuid());
+        when(redisUtil.zReverseRange(anyString(), anyLong(), anyLong())).thenReturn(userUuids);
+        
         // Mock user service response
-        PageResponseDTO<UserProfileResponseDTO> pageData = new PageResponseDTO<>();
-        pageData.setContent(Arrays.asList(userDTO));
-        pageData.setTotalElements(1);
-        pageData.setHasNext(false);
-        
-        ApiResponse<PageResponseDTO<UserProfileResponseDTO>> userResponse = new ApiResponse<>();
+        ApiResponse<List<UserProfileResponseDTO>> userResponse = new ApiResponse<>();
         userResponse.setCode(200);
-        userResponse.setData(pageData);
+        userResponse.setData(Arrays.asList(userDTO));
         
-        when(userServiceClient.getAllUsersForRanking(anyInt(), anyInt(), anyString(), anyString()))
+        when(userServiceClient.getUsersBatch(anyList()))
                 .thenReturn(userResponse);
         
         // Mock gamification service response
@@ -110,7 +111,9 @@ class RankingServiceTest {
 
         assertNotNull(result);
         assertNotNull(result.getContent());
-        verify(userServiceClient, atLeastOnce()).getAllUsersForRanking(anyInt(), anyInt(), anyString(), anyString());
+        verify(redisUtil, atLeastOnce()).zCard(anyString());
+        verify(redisUtil, atLeastOnce()).zReverseRange(anyString(), anyLong(), anyLong());
+        verify(userServiceClient, atLeastOnce()).getUsersBatch(anyList());
         verify(gamificationServiceClient, atLeastOnce()).getBatchUsersStats(anyList());
     }
 
