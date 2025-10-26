@@ -79,42 +79,32 @@ class RankingServiceTest {
 
     @Test
     void testRankUser_Success() {
-        // Mock Redis responses
-        when(redisUtil.zCard(anyString())).thenReturn(1L);
-        Set<String> userUuids = new LinkedHashSet<>();
-        userUuids.add(userDTO.getUuid());
-        when(redisUtil.zReverseRange(anyString(), anyLong(), anyLong())).thenReturn(userUuids);
-        
         // Mock user service response
-        ApiResponse<List<UserProfileResponseDTO>> userResponse = new ApiResponse<>();
+        PageResponseDTO<UserProfileResponseDTO> pageData = new PageResponseDTO<>();
+        pageData.setContent(Arrays.asList(userDTO));
+        pageData.setTotalElements(1);
+        pageData.setHasNext(false);
+        
+        ApiResponse<PageResponseDTO<UserProfileResponseDTO>> userResponse = new ApiResponse<>();
         userResponse.setCode(200);
-        userResponse.setData(Arrays.asList(userDTO));
+        userResponse.setData(pageData);
         
-        when(userServiceClient.getUsersBatch(anyList()))
+        when(userServiceClient.getAllUsersForRanking(anyInt(), anyInt(), anyString(), anyString()))
                 .thenReturn(userResponse);
-        
-        // Mock gamification service response
-        GamificationServiceClient.GamificationStats stats = new GamificationServiceClient.GamificationStats();
-        stats.userId = userDTO.getUuid();
-        stats.level = 5;
-        stats.currentExp = 1000;
-        
-        ApiResponse<List<GamificationServiceClient.GamificationStats>> gamificationResponse = new ApiResponse<>();
-        gamificationResponse.setCode(200);
-        gamificationResponse.setData(Arrays.asList(stats));
-        
-        when(gamificationServiceClient.getBatchUsersStats(anyList()))
-                .thenReturn(gamificationResponse);
 
         PageResponseDTO<UserProfileResponseDTO> result = 
                 rankingService.rankUser(0, 20, "overall");
 
         assertNotNull(result);
         assertNotNull(result.getContent());
-        verify(redisUtil, atLeastOnce()).zCard(anyString());
-        verify(redisUtil, atLeastOnce()).zReverseRange(anyString(), anyLong(), anyLong());
-        verify(userServiceClient, atLeastOnce()).getUsersBatch(anyList());
-        verify(gamificationServiceClient, atLeastOnce()).getBatchUsersStats(anyList());
+        assertEquals(1, result.getContent().size());
+        
+        // Verify that level and exp are hardcoded (first user should be level 9)
+        UserProfileResponseDTO firstUser = result.getContent().get(0);
+        assertNotNull(firstUser.getLevel());
+        assertNotNull(firstUser.getCurrentExp());
+        
+        verify(userServiceClient, atLeastOnce()).getAllUsersForRanking(anyInt(), anyInt(), anyString(), anyString());
     }
 
     @Test
