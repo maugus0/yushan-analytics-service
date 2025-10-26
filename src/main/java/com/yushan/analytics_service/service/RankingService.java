@@ -67,7 +67,7 @@ public class RankingService {
         List<NovelDetailResponseDTO> novelsFromService;
         try {
             ApiResponse<List<NovelDetailResponseDTO>> response = contentServiceClient.getNovelsBatch(orderedNovelIds);
-            novelsFromService = (response != null && response.isSuccess() && response.getData() != null) 
+            novelsFromService = (response != null && response.getCode() != null && response.getCode().equals(200) && response.getData() != null) 
                     ? response.getData() 
                     : Collections.emptyList();
         } catch (Exception e) {
@@ -96,7 +96,7 @@ public class RankingService {
         // Verify novel exists
         try {
             ApiResponse<NovelDetailResponseDTO> response = contentServiceClient.getNovelById(novelId);
-            if (response == null || !response.isSuccess() || response.getData() == null) {
+            if (response == null || response.getCode() == null || !response.getCode().equals(200) || response.getData() == null) {
                 throw new ResourceNotFoundException("Novel not found, id: " + novelId);
             }
             NovelDetailResponseDTO novel = response.getData();
@@ -155,7 +155,7 @@ public class RankingService {
                 uuids -> {
                     try {
                         ApiResponse<List<UserProfileResponseDTO>> response = userServiceClient.getUsersBatch(uuids);
-                        return (response != null && response.isSuccess() && response.getData() != null) 
+                        return (response != null && response.getCode() != null && response.getCode().equals(200) && response.getData() != null) 
                                 ? response.getData() 
                                 : Collections.emptyList();
                     } catch (Exception e) {
@@ -194,7 +194,7 @@ public class RankingService {
         List<UserProfileResponseDTO> userProfiles;
         try {
             ApiResponse<List<UserProfileResponseDTO>> response = userServiceClient.getUsersBatch(orderedAuthorUuids);
-            userProfiles = (response != null && response.isSuccess() && response.getData() != null) 
+            userProfiles = (response != null && response.getCode() != null && response.getCode().equals(200) && response.getData() != null) 
                     ? response.getData() 
                     : Collections.emptyList();
         } catch (Exception e) {

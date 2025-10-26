@@ -39,11 +39,6 @@ public class UserProfileResponseDTO {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX", timezone = "UTC")
     private Date lastLogin;
 
-    // Gamification fields for ranking
-    private Integer exp;
-    private Integer yuan;
-    private Integer level;
-
     public Date getBirthday() {
         return birthday != null ? new Date(birthday.getTime()) : null;
     }

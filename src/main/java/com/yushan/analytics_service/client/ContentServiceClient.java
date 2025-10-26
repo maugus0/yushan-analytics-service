@@ -29,10 +29,12 @@ public interface ContentServiceClient {
     @PostMapping("/api/v1/novels/batch/get")
     ApiResponse<List<NovelDetailResponseDTO>> getNovelsBatch(@RequestBody List<Integer> novelIds);
 
-    @GetMapping("/api/v1/novels")
+    @GetMapping("/api/v1/novels/admin/all")
     ApiResponse<PageResponseDTO<NovelDetailResponseDTO>> getNovels(
             @RequestParam(value = "page", defaultValue = "0") Integer page,
-            @RequestParam(value = "size", defaultValue = "50") Integer size
+            @RequestParam(value = "size", defaultValue = "50") Integer size,
+            @RequestParam(value = "sort", defaultValue = "createTime") String sort,
+            @RequestParam(value = "order", defaultValue = "desc") String order
     );
 
     @GetMapping("/api/v1/novels/count")

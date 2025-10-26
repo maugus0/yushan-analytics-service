@@ -1,11 +1,10 @@
 package com.yushan.analytics_service.service;
 
 import com.yushan.analytics_service.client.ContentServiceClient;
-import com.yushan.analytics_service.client.UserServiceClient;
+import com.yushan.analytics_service.client.GamificationServiceClient;
 import com.yushan.analytics_service.dto.ApiResponse;
 import com.yushan.analytics_service.dto.NovelDetailResponseDTO;
 import com.yushan.analytics_service.dto.PageResponseDTO;
-import com.yushan.analytics_service.dto.UserProfileResponseDTO;
 import com.yushan.analytics_service.util.RedisUtil;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +26,7 @@ public class RankingUpdateService {
     private ContentServiceClient contentServiceClient;
 
     @Autowired
-    private UserServiceClient userServiceClient;
+    private GamificationServiceClient gamificationServiceClient;
 
     @Autowired
     private RedisUtil redisUtil;
@@ -79,9 +78,9 @@ public class RankingUpdateService {
             
             while (hasMore && page < 100) { // Limit to 100 pages (10000 novels) for safety
                 ApiResponse<PageResponseDTO<NovelDetailResponseDTO>> response = 
-                        contentServiceClient.getNovels(page, size);
+                        contentServiceClient.getNovels(page, size, "createTime", "desc");
                 
-                if (response == null || !response.isSuccess() || response.getData() == null) {
+                if (response == null || response.getCode() == null || !response.getCode().equals(200) || response.getData() == null) {
                     log.warn("Failed to fetch novels page {} for ranking", page);
                     break;
                 }
@@ -160,30 +159,32 @@ public class RankingUpdateService {
 
     /**
      * Update user rankings in Redis
+     * Uses gamification service to get exp data
      */
     public void updateUserRankings() {
         log.info("Updating user rankings");
         try {
-            ApiResponse<List<UserProfileResponseDTO>> response = userServiceClient.getAllUsersForRanking();
+            // Fetch all users' gamification stats from gamification service
+            ApiResponse<List<GamificationServiceClient.GamificationStats>> response = gamificationServiceClient.getAllUsersStats();
             
-            if (response == null || !response.isSuccess() || response.getData() == null) {
-                log.warn("Failed to fetch users for ranking");
+            if (response == null || response.getCode() == null || !response.getCode().equals(200) || response.getData() == null) {
+                log.warn("Failed to fetch users gamification stats for ranking");
                 return;
             }
 
-            List<UserProfileResponseDTO> allUsers = response.getData();
+            List<GamificationServiceClient.GamificationStats> allUserStats = response.getData();
 
             // Clear old ranking key
             redisUtil.delete(RANK_USER_EXP);
 
-            // Update user rankings
-            for (UserProfileResponseDTO user : allUsers) {
-                if (user.getExp() != null && user.getUuid() != null) {
-                    redisUtil.zAdd(RANK_USER_EXP, user.getUuid(), user.getExp());
+            // Update user rankings based on exp
+            for (GamificationServiceClient.GamificationStats stats : allUserStats) {
+                if (stats.currentExp != null && stats.userId != null) {
+                    redisUtil.zAdd(RANK_USER_EXP, stats.userId, stats.currentExp.doubleValue());
                 }
             }
             
-            log.info("Updated rankings for {} users", allUsers.size());
+            log.info("Updated rankings for {} users", allUserStats.size());
         } catch (Exception e) {
             log.error("Error updating user rankings: {}", e.getMessage(), e);
         }
