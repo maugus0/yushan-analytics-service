@@ -7,12 +7,15 @@ import com.yushan.analytics_service.dto.NovelRankDTO;
 import com.yushan.analytics_service.dto.PageResponseDTO;
 import com.yushan.analytics_service.dto.UserProfileResponseDTO;
 import com.yushan.analytics_service.service.RankingService;
+import com.yushan.analytics_service.service.RankingUpdateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,6 +27,9 @@ public class RankingController {
 
     @Autowired
     private RankingService rankingService;
+    
+    @Autowired
+    private RankingUpdateService rankingUpdateService;
 
     /**
      * Get novel ranking with pagination and filtering
@@ -131,6 +137,22 @@ public class RankingController {
         }
 
         return ApiResponse.success("Novel rank retrieved successfully", rank);
+    }
+    
+    /**
+     * Manually trigger ranking update (Admin only)
+     * This will update all rankings: novels, users, and authors
+     */
+    @Operation(summary = "Update all rankings", description = "Manually trigger an update of all ranking data (Admin only)")
+    @PostMapping("/update")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ApiResponse<String> updateRankings() {
+        try {
+            rankingUpdateService.updateAllRankings();
+            return ApiResponse.success("Rankings updated successfully", "All ranking data has been refreshed");
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to update rankings: " + e.getMessage());
+        }
     }
 }
 
