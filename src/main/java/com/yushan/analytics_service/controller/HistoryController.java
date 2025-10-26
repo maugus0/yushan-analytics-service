@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/history")
+@RequestMapping("/api/v1/history")
 public class HistoryController {
 
     @Autowired
