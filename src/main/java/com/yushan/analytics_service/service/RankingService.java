@@ -1,6 +1,7 @@
 package com.yushan.analytics_service.service;
 
 import com.yushan.analytics_service.client.ContentServiceClient;
+import com.yushan.analytics_service.client.GamificationServiceClient;
 import com.yushan.analytics_service.client.UserServiceClient;
 import com.yushan.analytics_service.dto.ApiResponse;
 import com.yushan.analytics_service.dto.AuthorResponseDTO;
@@ -14,7 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,59 +38,76 @@ public class RankingService {
     private UserServiceClient userServiceClient;
 
     @Autowired
+    private GamificationServiceClient gamificationServiceClient;
+
+    @Autowired
     private RedisUtil redisUtil;
 
     /**
-     * Get novel ranking with pagination
+     * Get novel ranking with pagination - fetches all novels and sorts by votes
      */
     public PageResponseDTO<NovelDetailResponseDTO> rankNovel(
             Integer page, Integer size, String sortType, Integer categoryId, String timeRange) {
-
-        String redisKey = buildNovelRedisKey(sortType, categoryId);
-        long offset = (long) page * size;
-
-        Long totalInRedis = redisUtil.zCard(redisKey);
-        long totalElements = totalInRedis != null ? Math.min(totalInRedis, 100) : 0;
-
-        if (offset >= totalElements) {
-            return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
-        }
-
-        long end = offset + size - 1;
-        Set<String> novelIdsStr = redisUtil.zReverseRange(redisKey, offset, end);
-
-        if (novelIdsStr == null || novelIdsStr.isEmpty()) {
-            return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
-        }
-
-        List<Integer> orderedNovelIds = novelIdsStr.stream()
-                .map(Integer::parseInt)
-                .collect(Collectors.toList());
-
-        // Fetch novels from content service
-        List<NovelDetailResponseDTO> novelsFromService;
+        
+        log.info("Fetching novel ranking: page={}, size={}, sortType={}, categoryId={}", 
+                page, size, sortType, categoryId);
+        
         try {
-            ApiResponse<List<NovelDetailResponseDTO>> response = contentServiceClient.getNovelsBatch(orderedNovelIds);
-            novelsFromService = (response != null && response.getCode() != null && response.getCode().equals(200) && response.getData() != null) 
-                    ? response.getData() 
-                    : Collections.emptyList();
+            // Fetch ALL novels from content service (paginate through all pages)
+            List<NovelDetailResponseDTO> allNovels = new ArrayList<>();
+            int fetchPage = 0;
+            int fetchSize = 100;
+            boolean hasMore = true;
+            
+            while (hasMore && fetchPage < 50) { // Limit to 50 pages for safety
+                ApiResponse<PageResponseDTO<NovelDetailResponseDTO>> response = 
+                        contentServiceClient.getNovels(fetchPage, fetchSize, "createTime", "desc");
+                
+                if (response == null || response.getCode() == null || !response.getCode().equals(200) || response.getData() == null) {
+                    log.warn("Failed to fetch novels page {}", fetchPage);
+                    break;
+                }
+                
+                PageResponseDTO<NovelDetailResponseDTO> pageData = response.getData();
+                if (pageData.getContent() == null || pageData.getContent().isEmpty()) {
+                    break;
+                }
+                
+                allNovels.addAll(pageData.getContent());
+                hasMore = pageData.isHasNext();
+                fetchPage++;
+            }
+            
+            log.info("Fetched {} total novels", allNovels.size());
+            
+            // Filter by category if specified
+            if (categoryId != null) {
+                allNovels = allNovels.stream()
+                        .filter(novel -> categoryId.equals(novel.getCategoryId()))
+                        .collect(Collectors.toList());
+            }
+            
+            // Sort by votes (voteCnt)
+            allNovels.sort(Comparator.comparing(NovelDetailResponseDTO::getVoteCnt,
+                    Comparator.nullsLast(Comparator.reverseOrder())));
+            
+            // Paginate the results
+            int totalElements = allNovels.size();
+            int start = page * size;
+            int end = Math.min(start + size, totalElements);
+            
+            if (start >= totalElements) {
+                return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
+            }
+            
+            List<NovelDetailResponseDTO> paginatedNovels = allNovels.subList(start, end);
+            
+            return PageResponseDTO.of(paginatedNovels, totalElements, page, size);
+            
         } catch (Exception e) {
-            log.error("Error fetching novels from content service: {}", e.getMessage());
-            novelsFromService = Collections.emptyList();
+            log.error("Error fetching novel ranking: {}", e.getMessage(), e);
+            return PageResponseDTO.of(Collections.emptyList(), 0, page, size);
         }
-
-        Map<Integer, NovelDetailResponseDTO> novelMap = novelsFromService.stream()
-                .collect(Collectors.toMap(NovelDetailResponseDTO::getId, Function.identity()));
-
-        List<NovelDetailResponseDTO> sortedNovels = orderedNovelIds.stream()
-                .map(novelMap::get)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-
-        // Category names are already in the NovelDetailResponseDTO from content service
-        // No need to fetch separately
-
-        return PageResponseDTO.of(sortedNovels, totalElements, page, size);
     }
 
     /**
@@ -147,94 +168,198 @@ public class RankingService {
     }
 
     /**
-     * Get user ranking with pagination
+     * Get user ranking with pagination - fetches users and their gamification stats, sorts by level and exp
      */
     public PageResponseDTO<UserProfileResponseDTO> rankUser(Integer page, Integer size, String timeRange) {
-        String redisKey = "ranking:user:exp";
-        return getPaginatedRanking(page, size, redisKey,
-                uuids -> {
-                    try {
-                        ApiResponse<List<UserProfileResponseDTO>> response = userServiceClient.getUsersBatch(uuids);
-                        return (response != null && response.getCode() != null && response.getCode().equals(200) && response.getData() != null) 
-                                ? response.getData() 
-                                : Collections.emptyList();
-                    } catch (Exception e) {
-                        log.error("Error fetching users from user service: {}", e.getMessage());
-                        return Collections.emptyList();
-                    }
-                },
-                dto -> UUID.fromString(dto.getUuid())
-        );
+        log.info("Fetching user ranking: page={}, size={}", page, size);
+        
+        try {
+            // Fetch ALL users from user service
+            List<UserProfileResponseDTO> allUsers = new ArrayList<>();
+            int fetchPage = 0;
+            int fetchSize = 100;
+            boolean hasMore = true;
+            
+            while (hasMore && fetchPage < 20) { // Limit to 20 pages
+                ApiResponse<PageResponseDTO<UserProfileResponseDTO>> response = 
+                        userServiceClient.getAllUsersForRanking(fetchPage, fetchSize, "createTime", "desc");
+                
+                if (response == null || response.getCode() == null || !response.getCode().equals(200) || response.getData() == null) {
+                    log.warn("Failed to fetch users page {}", fetchPage);
+                    break;
+                }
+                
+                PageResponseDTO<UserProfileResponseDTO> pageData = response.getData();
+                if (pageData.getContent() == null || pageData.getContent().isEmpty()) {
+                    break;
+                }
+                
+                allUsers.addAll(pageData.getContent());
+                hasMore = pageData.isHasNext();
+                fetchPage++;
+            }
+            
+            log.info("Fetched {} total users", allUsers.size());
+            
+            // Get user IDs
+            List<String> userIds = allUsers.stream()
+                    .map(UserProfileResponseDTO::getUuid)
+                    .collect(Collectors.toList());
+            
+            // Fetch gamification stats for all users
+            Map<String, GamificationServiceClient.GamificationStats> statsMap = new HashMap<>();
+            try {
+                ApiResponse<List<GamificationServiceClient.GamificationStats>> statsResponse = 
+                        gamificationServiceClient.getBatchUsersStats(userIds);
+                
+                if (statsResponse != null && statsResponse.getCode() != null && 
+                    statsResponse.getCode().equals(200) && statsResponse.getData() != null) {
+                    statsMap = statsResponse.getData().stream()
+                            .collect(Collectors.toMap(
+                                    stats -> stats.userId,
+                                    Function.identity(),
+                                    (existing, replacement) -> existing
+                            ));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to fetch gamification stats: {}", e.getMessage());
+            }
+            
+            // Create a sortable list with level and exp
+            final Map<String, GamificationServiceClient.GamificationStats> finalStatsMap = statsMap;
+            List<UserWithStats> usersWithStats = allUsers.stream()
+                    .map(user -> {
+                        UserWithStats uws = new UserWithStats();
+                        uws.user = user;
+                        GamificationServiceClient.GamificationStats stats = finalStatsMap.get(user.getUuid());
+                        uws.level = stats != null && stats.level != null ? stats.level : 0;
+                        uws.exp = stats != null && stats.currentExp != null ? stats.currentExp : 0;
+                        return uws;
+                    })
+                    .sorted(Comparator.comparing((UserWithStats u) -> u.level)
+                            .thenComparing(u -> u.exp)
+                            .reversed())
+                    .collect(Collectors.toList());
+            
+            // Paginate
+            int totalElements = usersWithStats.size();
+            int start = page * size;
+            int end = Math.min(start + size, totalElements);
+            
+            if (start >= totalElements) {
+                return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
+            }
+            
+            List<UserProfileResponseDTO> paginatedUsers = usersWithStats.subList(start, end).stream()
+                    .map(uws -> uws.user)
+                    .collect(Collectors.toList());
+            
+            return PageResponseDTO.of(paginatedUsers, totalElements, page, size);
+            
+        } catch (Exception e) {
+            log.error("Error fetching user ranking: {}", e.getMessage(), e);
+            return PageResponseDTO.of(Collections.emptyList(), 0, page, size);
+        }
+    }
+    
+    // Helper class for sorting users by level and exp
+    private static class UserWithStats {
+        UserProfileResponseDTO user;
+        int level;
+        int exp;
     }
 
     /**
-     * Get author ranking with pagination
+     * Get author ranking with pagination - aggregates novels by author and sorts by total votes
      */
     public PageResponseDTO<AuthorResponseDTO> rankAuthor(Integer page, Integer size, String sortType, String timeRange) {
-        String redisKey = "ranking:author:" + sortType;
-        long offset = (long) page * size;
-
-        Long totalInRedis = redisUtil.zCard(redisKey);
-        long totalElements = totalInRedis != null ? Math.min(totalInRedis, 100) : 0;
-
-        if (offset >= totalElements) {
-            return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
-        }
-
-        Set<String> authorUuidsStr = redisUtil.zReverseRange(redisKey, offset, offset + size - 1);
-        if (authorUuidsStr == null || authorUuidsStr.isEmpty()) {
-            return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
-        }
-
-        List<UUID> orderedAuthorUuids = authorUuidsStr.stream()
-                .map(UUID::fromString)
-                .collect(Collectors.toList());
-
-        // Fetch user profiles for these authors
-        List<UserProfileResponseDTO> userProfiles;
+        log.info("Fetching author ranking: page={}, size={}, sortType={}", page, size, sortType);
+        
         try {
-            ApiResponse<List<UserProfileResponseDTO>> response = userServiceClient.getUsersBatch(orderedAuthorUuids);
-            userProfiles = (response != null && response.getCode() != null && response.getCode().equals(200) && response.getData() != null) 
-                    ? response.getData() 
-                    : Collections.emptyList();
+            // Fetch ALL novels from content service
+            List<NovelDetailResponseDTO> allNovels = new ArrayList<>();
+            int fetchPage = 0;
+            int fetchSize = 100;
+            boolean hasMore = true;
+            
+            while (hasMore && fetchPage < 50) {
+                ApiResponse<PageResponseDTO<NovelDetailResponseDTO>> response = 
+                        contentServiceClient.getNovels(fetchPage, fetchSize, "createTime", "desc");
+                
+                if (response == null || response.getCode() == null || !response.getCode().equals(200) || response.getData() == null) {
+                    log.warn("Failed to fetch novels page {}", fetchPage);
+                    break;
+                }
+                
+                PageResponseDTO<NovelDetailResponseDTO> pageData = response.getData();
+                if (pageData.getContent() == null || pageData.getContent().isEmpty()) {
+                    break;
+                }
+                
+                allNovels.addAll(pageData.getContent());
+                hasMore = pageData.isHasNext();
+                fetchPage++;
+            }
+            
+            log.info("Fetched {} total novels for author ranking", allNovels.size());
+            
+            // Aggregate by author
+            Map<String, AuthorStats> authorStatsMap = new HashMap<>();
+            for (NovelDetailResponseDTO novel : allNovels) {
+                if (novel.getAuthorId() == null) {
+                    continue;
+                }
+                
+                String authorId = novel.getAuthorId().toString();
+                AuthorStats stats = authorStatsMap.computeIfAbsent(authorId, k -> new AuthorStats());
+                stats.authorId = authorId;
+                stats.authorName = novel.getAuthorUsername();
+                stats.totalVotes += (novel.getVoteCnt() != null ? novel.getVoteCnt() : 0);
+                stats.totalViews += (novel.getViewCnt() != null ? novel.getViewCnt() : 0);
+                stats.novelCount++;
+            }
+            
+            // Convert to list and sort by votes
+            List<AuthorResponseDTO> authors = authorStatsMap.values().stream()
+                    .map(stats -> {
+                        AuthorResponseDTO dto = new AuthorResponseDTO();
+                        dto.setUuid(stats.authorId);
+                        dto.setUsername(stats.authorName);
+                        dto.setTotalVoteCnt(stats.totalVotes);
+                        dto.setTotalViewCnt(stats.totalViews);
+                        dto.setNovelNum(stats.novelCount);
+                        return dto;
+                    })
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator.comparing(AuthorResponseDTO::getTotalVoteCnt).reversed())
+                    .collect(Collectors.toList());
+            
+            // Paginate
+            int totalElements = authors.size();
+            int start = page * size;
+            int end = Math.min(start + size, totalElements);
+            
+            if (start >= totalElements) {
+                return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
+            }
+            
+            List<AuthorResponseDTO> paginatedAuthors = authors.subList(start, end);
+            
+            return PageResponseDTO.of(paginatedAuthors, totalElements, page, size);
+            
         } catch (Exception e) {
-            log.error("Error fetching user profiles for authors: {}", e.getMessage());
-            userProfiles = Collections.emptyList();
+            log.error("Error fetching author ranking: {}", e.getMessage(), e);
+            return PageResponseDTO.of(Collections.emptyList(), 0, page, size);
         }
-
-        // Create map for quick lookup
-        Map<UUID, UserProfileResponseDTO> profileMap = userProfiles.stream()
-                .filter(p -> p.getUuid() != null)
-                .collect(Collectors.toMap(p -> UUID.fromString(p.getUuid()), Function.identity()));
-
-        // Combine user profiles with author statistics from Redis
-        List<AuthorResponseDTO> authorDTOs = orderedAuthorUuids.stream()
-                .map(uuid -> {
-                    UserProfileResponseDTO profile = profileMap.get(uuid);
-                    if (profile == null) {
-                        return null;
-                    }
-                    
-                    AuthorResponseDTO dto = new AuthorResponseDTO();
-                    dto.setUuid(uuid.toString());
-                    dto.setUsername(profile.getUsername());
-                    dto.setAvatarUrl(profile.getAvatarUrl());
-                    
-                    // Get statistics from Redis
-                    Double voteCount = redisUtil.zScore("ranking:author:vote", uuid.toString());
-                    Double viewCount = redisUtil.zScore("ranking:author:view", uuid.toString());
-                    Double novelCount = redisUtil.zScore("ranking:author:novelNum", uuid.toString());
-                    
-                    dto.setTotalVoteCnt(voteCount != null ? voteCount.intValue() : 0);
-                    dto.setTotalViewCnt(viewCount != null ? viewCount.intValue() : 0);
-                    dto.setNovelNum(novelCount != null ? novelCount.intValue() : 0);
-                    
-                    return dto;
-                })
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-
-        return PageResponseDTO.of(authorDTOs, totalElements, page, size);
+    }
+    
+    // Helper class for aggregating author stats
+    private static class AuthorStats {
+        String authorId;
+        String authorName;
+        int totalVotes;
+        int totalViews;
+        int novelCount;
     }
 
     /**

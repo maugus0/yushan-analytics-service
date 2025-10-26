@@ -74,13 +74,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/ranking/**").permitAll()
 
                         // History APIs - all require authentication
-                        .requestMatchers(HttpMethod.GET, "/api/history/**").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/history/**").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/api/history/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/history/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/history/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/history/**").authenticated()
 
                         // Admin endpoints - MUST come before general auth rules
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/history/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/history/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/*/admin/**").hasRole("ADMIN")
 
                         // All other requests require authentication
