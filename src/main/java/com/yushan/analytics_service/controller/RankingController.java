@@ -145,7 +145,7 @@ public class RankingController {
      */
     @Operation(summary = "Update all rankings", description = "Manually trigger an update of all ranking data (Admin only)")
     @PostMapping("/update")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<String> updateRankings() {
         try {
             rankingUpdateService.updateAllRankings();
