@@ -168,110 +168,103 @@ public class RankingService {
     }
 
     /**
-     * Get user ranking with pagination - fetches users and their gamification stats, sorts by level and exp
+     * Get user ranking with pagination - uses Redis data populated by RankingUpdateService
      */
     public PageResponseDTO<UserProfileResponseDTO> rankUser(Integer page, Integer size, String timeRange) {
-        log.info("Fetching user ranking: page={}, size={}", page, size);
+        log.info("Fetching user ranking from Redis: page={}, size={}", page, size);
         
-        try {
-            // Fetch ALL users from user service
-            List<UserProfileResponseDTO> allUsers = new ArrayList<>();
-            int fetchPage = 0;
-            int fetchSize = 100;
-            boolean hasMore = true;
-            
-            while (hasMore && fetchPage < 20) { // Limit to 20 pages
-                ApiResponse<PageResponseDTO<UserProfileResponseDTO>> response = 
-                        userServiceClient.getAllUsersForRanking(fetchPage, fetchSize, "createTime", "desc");
-                
-                if (response == null || response.getCode() == null || !response.getCode().equals(200) || response.getData() == null) {
-                    log.warn("Failed to fetch users page {}", fetchPage);
-                    break;
-                }
-                
-                PageResponseDTO<UserProfileResponseDTO> pageData = response.getData();
-                if (pageData.getContent() == null || pageData.getContent().isEmpty()) {
-                    break;
-                }
-                
-                allUsers.addAll(pageData.getContent());
-                hasMore = pageData.isHasNext();
-                fetchPage++;
-            }
-            
-            log.info("Fetched {} total users", allUsers.size());
-            
-            // Get user IDs
-            List<String> userIds = allUsers.stream()
-                    .map(UserProfileResponseDTO::getUuid)
-                    .collect(Collectors.toList());
-            
-            // Fetch gamification stats for all users
-            Map<String, GamificationServiceClient.GamificationStats> statsMap = new HashMap<>();
-            try {
-                ApiResponse<List<GamificationServiceClient.GamificationStats>> statsResponse = 
-                        gamificationServiceClient.getBatchUsersStats(userIds);
-                
-                if (statsResponse != null && statsResponse.getCode() != null && 
-                    statsResponse.getCode().equals(200) && statsResponse.getData() != null) {
-                    statsMap = statsResponse.getData().stream()
-                            .collect(Collectors.toMap(
-                                    stats -> stats.userId,
-                                    Function.identity(),
-                                    (existing, replacement) -> existing
-                            ));
-                }
-            } catch (Exception e) {
-                log.warn("Failed to fetch gamification stats: {}", e.getMessage());
-            }
-            
-            // Create a sortable list with level and exp
-            final Map<String, GamificationServiceClient.GamificationStats> finalStatsMap = statsMap;
-            List<UserWithStats> usersWithStats = allUsers.stream()
-                    .map(user -> {
-                        UserWithStats uws = new UserWithStats();
-                        uws.user = user;
-                        GamificationServiceClient.GamificationStats stats = finalStatsMap.get(user.getUuid());
-                        uws.level = stats != null && stats.level != null ? stats.level : 0;
-                        uws.exp = stats != null && stats.currentExp != null ? stats.currentExp : 0;
-                        return uws;
-                    })
-                    .sorted(Comparator.comparing((UserWithStats u) -> u.level)
-                            .thenComparing(u -> u.exp)
-                            .reversed())
-                    .collect(Collectors.toList());
-            
-            // Paginate
-            int totalElements = usersWithStats.size();
-            int start = page * size;
-            int end = Math.min(start + size, totalElements);
-            
-            if (start >= totalElements) {
-                return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
-            }
-            
-            List<UserProfileResponseDTO> paginatedUsers = usersWithStats.subList(start, end).stream()
-                    .map(uws -> {
-                        // Populate level and exp for ranking response
-                        uws.user.setLevel(uws.level);
-                        uws.user.setCurrentExp(uws.exp);
-                        return uws.user;
-                    })
-                    .collect(Collectors.toList());
-            
-            return PageResponseDTO.of(paginatedUsers, totalElements, page, size);
-            
-        } catch (Exception e) {
-            log.error("Error fetching user ranking: {}", e.getMessage(), e);
+        String redisKey = "ranking:user:exp";
+        long offset = (long) page * size;
+        
+        // Get total count from Redis
+        Long totalInRedis = redisUtil.zCard(redisKey);
+        long totalElements = totalInRedis != null ? totalInRedis : 0;
+        
+        if (totalElements == 0) {
+            log.warn("No user ranking data in Redis. Please trigger ranking update.");
             return PageResponseDTO.of(Collections.emptyList(), 0, page, size);
         }
-    }
-    
-    // Helper class for sorting users by level and exp
-    private static class UserWithStats {
-        UserProfileResponseDTO user;
-        int level;
-        int exp;
+        
+        if (offset >= totalElements) {
+            return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
+        }
+        
+        long end = offset + size - 1;
+        Set<String> userUuidsStr = redisUtil.zReverseRange(redisKey, offset, end);
+        
+        if (userUuidsStr == null || userUuidsStr.isEmpty()) {
+            return PageResponseDTO.of(Collections.emptyList(), totalElements, page, size);
+        }
+        
+        List<String> orderedUserUuids = new ArrayList<>(userUuidsStr);
+        
+        // Fetch user profiles from user service
+        List<UUID> uuidList = orderedUserUuids.stream()
+                .map(UUID::fromString)
+                .collect(Collectors.toList());
+        
+        List<UserProfileResponseDTO> users;
+        try {
+            ApiResponse<List<UserProfileResponseDTO>> response = userServiceClient.getUsersBatch(uuidList);
+            users = (response != null && response.getCode() != null && response.getCode().equals(200) && response.getData() != null) 
+                    ? response.getData() 
+                    : Collections.emptyList();
+        } catch (Exception e) {
+            log.error("Error fetching users from user service: {}", e.getMessage());
+            users = Collections.emptyList();
+        }
+        
+        // Fetch gamification stats for these users
+        Map<String, GamificationServiceClient.GamificationStats> statsMap = new HashMap<>();
+        try {
+            ApiResponse<List<GamificationServiceClient.GamificationStats>> statsResponse = 
+                    gamificationServiceClient.getBatchUsersStats(orderedUserUuids);
+            
+            if (statsResponse != null && statsResponse.getCode() != null && 
+                    statsResponse.getCode().equals(200) && statsResponse.getData() != null) {
+                statsMap = statsResponse.getData().stream()
+                        .collect(Collectors.toMap(
+                                stats -> stats.userId,
+                                Function.identity(),
+                                (existing, replacement) -> existing
+                        ));
+                log.info("Fetched gamification stats for {} users", statsMap.size());
+            } else {
+                log.warn("Failed to fetch gamification stats: response code = {}", 
+                        statsResponse != null ? statsResponse.getCode() : "null");
+            }
+        } catch (Exception e) {
+            log.error("Error fetching gamification stats: {}", e.getMessage(), e);
+        }
+        
+        // Make final for lambda
+        final Map<String, GamificationServiceClient.GamificationStats> finalStatsMap = statsMap;
+        
+        // Create map for quick lookup
+        Map<String, UserProfileResponseDTO> userMap = users.stream()
+                .collect(Collectors.toMap(UserProfileResponseDTO::getUuid, Function.identity()));
+        
+        // Build result list in order, enriched with level and exp
+        List<UserProfileResponseDTO> sortedUsers = orderedUserUuids.stream()
+                .map(uuid -> {
+                    UserProfileResponseDTO user = userMap.get(uuid);
+                    if (user != null) {
+                        // Enrich with gamification stats
+                        GamificationServiceClient.GamificationStats stats = finalStatsMap.get(uuid);
+                        if (stats != null) {
+                            user.setLevel(stats.level != null ? stats.level : 0);
+                            user.setCurrentExp(stats.currentExp != null ? stats.currentExp : 0);
+                        } else {
+                            user.setLevel(0);
+                            user.setCurrentExp(0);
+                        }
+                    }
+                    return user;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        
+        return PageResponseDTO.of(sortedUsers, totalElements, page, size);
     }
 
     /**
