@@ -251,7 +251,12 @@ public class RankingService {
             }
             
             List<UserProfileResponseDTO> paginatedUsers = usersWithStats.subList(start, end).stream()
-                    .map(uws -> uws.user)
+                    .map(uws -> {
+                        // Populate level and exp for ranking response
+                        uws.user.setLevel(uws.level);
+                        uws.user.setCurrentExp(uws.exp);
+                        return uws.user;
+                    })
                     .collect(Collectors.toList());
             
             return PageResponseDTO.of(paginatedUsers, totalElements, page, size);
@@ -370,8 +375,8 @@ public class RankingService {
 
         Long rank = redisUtil.zReverseRank(redisKey, novelId.toString());
 
-        if (rank == null || rank >= 100) {
-            return null;
+        if (rank == null) {
+            return null; // Novel not found in ranking
         }
 
         Double score = redisUtil.zScore(redisKey, novelId.toString());
